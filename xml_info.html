@@ -1,0 +1,49 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <meta name="xml_info" content="Oracle  XML">
+    <meta charset="utf-8">
+    <title>xml_info</title>
+    <style>
+    table, th, td {
+        border: 1px solid black;
+        border-collapse: collapse;
+    }
+    th, td {
+        padding: 5px;
+    }
+    </style>
+  </head>
+  <body id="body">
+  <script>
+//http://localhost:81/js/xml_info.html
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'http://localhost:8080/dd/CH.xml_info', true);
+    xhr.send();
+    xhr.onreadystatechange = () => {
+      var data = '';
+      if (xhr.readyState != 4) return;
+      if (xhr.status == 200) {
+        try {
+          var parser = new DOMParser();
+          var xmlDoc = parser.parseFromString(xhr.responseText, "text/xml");
+          var str = '<table><caption><strong>Загрузка процессора и БД сессиями</strong></caption><thead><tr><th>DT</th><th>USERNAME</th><th>CPU</th><th>DB</th></tr></thead><tbody>';
+          for (var i = 0; i < xmlDoc.getElementsByTagName("DT").length; i++) {
+            str = str + '<tr>' +
+                        '<td>' + xmlDoc.getElementsByTagName("DT")[i].childNodes[0].nodeValue + '</td>' +
+                        '<td>' + xmlDoc.getElementsByTagName("USERNAME")[i].childNodes[0].nodeValue + '</td>' + 
+                        '<td>' + xmlDoc.getElementsByTagName("CPU")[i].childNodes[0].nodeValue + '</td>' + 
+                        '<td>' + xmlDoc.getElementsByTagName("DB")[i].childNodes[0].nodeValue + '</td>' + 
+                        '</tr>';
+          }
+          body.innerHTML = str + '</tbody></table>';
+        } catch(e) {
+          console.log('Error: ' + e.name  + ' ' + e.message + ' ' + xhr.responseText);
+          alert('Error: ' + e.name  + ' ' + e.message);
+          return;
+        }
+      }
+    }
+  </script>
+  </body>
+</html>

@@ -1,0 +1,176 @@
+<!DOCTYPE HTML>
+<html>
+  <head>
+    <meta name="json_info" content="Oracle json">
+    <meta charset="utf-8">
+    <title>json_info</title>
+    <style>
+      html, body {
+        position: fixed; 
+        padding: 0%;
+        margin: 0%;
+      }
+    </style>
+  </head>
+  <body>
+  <script>
+//http://localhost:81/js/json_info.html
+function Graph(interval, left, top, width, height, delta_t, duration, cpu_num_cores, margin, splitting) {
+  this.interval = interval; // ÒÂÍÛÌ‰
+  this.left = left;
+  this.top = top;
+  this.width = width;
+  this.height = height;
+  this.delta_t = delta_t; // ÒÂÍÛÌ‰
+  this.duration = duration; // ÔÓ‰ÓÎÊËÚÂÎ¸ÌÓÒÚ¸ ÒÂÍÛÌ‰ 
+  this.cpu_num_cores = cpu_num_cores;
+  this.margin = margin;
+  this.splitting = splitting;
+  this.timerId;
+  var stroke_color = ['red', 'blue', 'yellow', 'green', 'orange', 'navy', 'violet', 'brown'];
+  var canvas, ctx, data_arr = [];
+  var d = new Date(), dmin = new Date(), dmax = new Date();
+  var ymin = 0, ymax = 0; // %
+  var x, y;
+//–§—É–Ω–∫—Ü–∏–∏
+  str_to_date = (s) => (new Date(Number(s.substr(6, 4)), Number(s.substr(3, 2)) - 1, Number(s.substr(0, 2)), Number(s.substr(11, 2)), Number(s.substr(14, 2)), Number(s.substr(17, 2)), 0));
+  pad = (number) => ((number <= 9) ? '0' + number : number);
+  date_to_str = (time) => (pad(time.getHours(), 2) + ':' + pad(time.getMinutes(), 2) + ':' + pad(time.getSeconds(), 2));
+  paint_grid = () => {
+    ctx.clearRect(0, 0, this.width, this.height);
+    ctx.strokeStyle="gray";
+    ctx.fillStyle = 'Snow';
+    ctx.strokeRect(this.margin.left * this.width / 100, this.margin.top * this.height / 100, (100 - this.margin.left - this.margin.right) * this.width / 100, (100 - this.margin.top - this.margin.bottom) * this.height / 100);
+    ctx.fillRect(this.margin.left * this.width / 100, this.margin.top * this.height / 100, (100 - this.margin.left - this.margin.right) * this.width / 100, (100 - this.margin.top - this.margin.bottom) * this.height / 100);
+    ctx.beginPath();
+    y = (100 - this.margin.top - this.margin.bottom) * this.height / 100 / this.splitting.y;
+    for (var i = 1; i < this.splitting.y; i++) {
+      ctx.moveTo(this.margin.left * this.width / 100, this.margin.top * this.height / 100 + y * i);
+      ctx.lineTo((100 - this.margin.left) * this.width / 100, this.margin.top * this.height / 100 + y * i);
+    }
+    x = (100 - this.margin.left - this.margin.right) * this.width / 100 / this.splitting.x;
+    for (var i = 1; i < this.splitting.x; i++) {
+      ctx.moveTo(this.margin.left * this.width / 100 + x * i, this.margin.top * this.height / 100);
+      ctx.lineTo(this.margin.left * this.width / 100 + x * i, (100 - this.margin.top) * this.height / 100);
+    }
+    ctx.stroke();
+  }
+  paint_text = () => {
+    var font_h = 18;
+    var t = new Date();
+    ctx.fillStyle = 'black'; 
+    ctx.font = font_h + 'px' + ' ' + 'Verdana';
+    ctx.textAlign = "left";
+    ctx.fillText('–ó–∞–≥—Ä—É–∑–∫–∞ –ø—Ä–æ—Ü–µ—Å—Å–æ—Ä–∞ —Å–µ—Å—Å–∏—è–º–∏', this.margin.left * this.width / 100, this.margin.top * this.height / 100 - font_h);
+    for (var j = 0; j < data_arr[data_arr.length - 1].arr.length; j++) {
+      ctx.fillStyle = stroke_color[j];
+      ctx.fillText(data_arr[data_arr.length - 1].arr[j].user, (101 - this.margin.left) * this.width / 100, this.margin.top * this.height / 100 + font_h * (j - 1));
+    }
+    font_h = 14;
+    ctx.fillStyle = 'black'; 
+    ctx.font = font_h + 'px' + ' ' + 'Verdana';
+    ctx.textAlign = "center";
+    x = (100 - this.margin.left - this.margin.right) * this.width / 100 / this.splitting.x;
+    for (var i = 0; i < this.splitting.x + 1; i++) {
+      t.setTime(dmin.getTime() + i * (dmax.getTime() - dmin.getTime()) / this.splitting.x);
+      ctx.fillText(date_to_str(t), this.margin.left * this.width / 100 + x * i, (100 - this.margin.top) * this.height / 100 + font_h * 1.5);
+    }
+    y = (100 - this.margin.top - this.margin.bottom) * this.height / 100 / this.splitting.y;
+    for (var i = 0; i < this.splitting.y + 1; i++) {
+      ctx.fillText((ymin + i * (ymax - ymin) / this.splitting.y) + '%', this.margin.left * this.width / 100 / 2, (100 - this.margin.bottom) * this.height / 100 - y * i + font_h / 2);
+    }
+  }
+  this.render = () => {
+    var xhr = new XMLHttpRequest();
+    xhr.open('GET', 'http://localhost:8080/dd/CH.json_info', true);
+    xhr.send();
+    xhr.onreadystatechange = () => {
+      var data = '';
+      if (xhr.readyState != 4) return;
+      if (xhr.status == 200) {
+        try {
+          data = JSON.parse(xhr.responseText);
+          data_arr.push(data);
+          paint_grid();
+          if (data_arr.length <= 1) return;
+          if ((new Date()).getTime() > d.getTime() + this.duration * 1000) clearInterval(this.timerId);
+          if (data_arr.length > this.delta_t) {
+            data_arr.shift();
+            dmax = str_to_date(data_arr[data_arr.length - 1].dt);
+          } else {
+            dmax = str_to_date(data_arr[1].dt);
+            dmax.setSeconds(dmax.getSeconds() + this.delta_t);
+          }
+          dmin = str_to_date(data_arr[1].dt);
+          data_arr.forEach((item, i, arr) => {
+            if (i >= 2 ) {
+              for (var j = 0; j < data_arr[data_arr.length - 1].arr.length; j++) {
+                if (typeof item.arr[j] !== 'undefined' && typeof arr[i - 1].arr[j] !== 'undefined') {
+                  var util = (item.arr[j].cpu - arr[i - 1].arr[j].cpu) / this.cpu_num_cores / this.interval;
+                  if (util > ymax) ymax = util;
+                }
+              }
+            }
+          });
+          ymax = Math.ceil(ymax / 10) * 10;
+          paint_text();
+          for (var j = 0; j < data_arr[data_arr.length - 1].arr.length; j++) {
+            ctx.beginPath();
+            ctx.strokeStyle = stroke_color[j];
+            data_arr.forEach((item, i, array) => {
+              if (i > 0 && typeof item.arr[j] !== 'undefined' && typeof array[i - 1].arr[j] !== 'undefined') {
+                  x = this.margin.left * this.width / 100 + ((100 - this.margin.left - this.margin.right) * this.width / 100 / (dmax.getTime() - dmin.getTime())) * (str_to_date(item.dt).getTime() - dmin.getTime());
+                  y =  (100 - this.margin.bottom) * this.height / 100 - ((100 - this.margin.top - this.margin.bottom) * this.height / 100 / (ymax - ymin)) * (item.arr[j].cpu - array[i - 1].arr[j].cpu) / 2; // * 100 / 100
+                  if (i == 1) ctx.moveTo(x, y);
+                  if (i > 1) ctx.lineTo(x, y);
+                  ctx.stroke();
+              }
+            });
+          }
+        } catch(e) {
+          console.log('Error: ' + e.name  + ' ' + e.message + ' ' + xhr.responseText);
+          alert('Error: ' + e.name  + ' ' + e.message);
+          clearInterval(this.timerId);
+          return;
+        }
+      }
+    }
+  }
+
+  this.init = () => {
+    canvas = document.getElementById('canvas');
+    if (canvas === null) {
+      canvas = document.createElement('canvas');
+      document.body.appendChild(canvas);
+    }
+    ctx = canvas.getContext('2d');
+    canvas.width  = this.width;
+    canvas.height = this.height;
+    canvas.style.width  = this.width + 'px';
+    canvas.style.height = this.height + 'px';
+    canvas.style.position = 'fixed';
+    canvas.style.padding = '0px';
+    canvas.style.margin = '0px';
+    canvas.style.top = this.top + 'px';
+    canvas.style.left = this.left + 'px';
+  }
+
+  this.start = () => {
+    this.timerId = setInterval(() => {
+      requestAnimationFrame(this.render);
+    }, this.interval * 1000); // ms
+  }
+
+}
+// –°—Ç–∞—Ä—Ç
+var g = new Graph(1, 0, 0, window.innerWidth, window.innerHeight, 60, 120, 2, {top: 10, left: 10, bottom: 10, right: 10}, {x: 6, y: 5});
+g.init();
+g.start();
+
+window.onresize = () => { 
+  g.width = window.innerWidth;
+  g.height = window.innerHeight;
+}
+  </script>
+  </body>
+</html>
